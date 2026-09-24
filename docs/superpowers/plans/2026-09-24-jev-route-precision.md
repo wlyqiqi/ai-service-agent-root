@@ -812,3 +812,4 @@ git status --short
 ```
 
 Expected: only intentional files remain.
+

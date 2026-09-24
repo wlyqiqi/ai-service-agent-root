@@ -1,6 +1,6 @@
 # Jev Route Intent Policy Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the two-field Jev Router (`capability` + `risk_level`) with a one-choice `route_intent` Router while keeping deterministic Policy as the authority for graph routing, execution class, allowed tools, and approval.
 
@@ -99,7 +99,7 @@ The implementation must reject a missing `type`, missing `probabilities`, or a `
 - Consumes: `ToolRegistry` and registered tool names.
 - Produces: `RouteIntent`, `TargetGraph`, `ExecutionClass`, `RoutePolicy`, `ROUTE_POLICY`, `resolve_route_policy(route_intent: str) -> RoutePolicy`, `route_intent_is_confident(route_intent: str, confidence: float) -> bool`, and `ToolRegistry.tools_for_names(names: Iterable[str]) -> list[BaseTool]`.
 
-- [ ] **Step 1: Write the failing route-policy tests**
+- [x] **Step 1: Write the failing route-policy tests**
 
 Create `tests/test_route_policy.py`:
 
@@ -165,7 +165,7 @@ def test_registry_tools_for_names_preserves_registry_order():
     assert [tool.name for tool in tools] == ["kb_search", "shipment_query"]
 ```
 
-- [ ] **Step 2: Run the new tests and verify they fail**
+- [x] **Step 2: Run the new tests and verify they fail**
 
 Run:
 
@@ -175,7 +175,7 @@ uv run --no-sync pytest tests/test_route_policy.py -q
 
 Expected: FAIL because `ai_service_agent.graph.route_policy` and `ToolRegistry.tools_for_names` do not exist.
 
-- [ ] **Step 3: Add registry lookup by explicit names**
+- [x] **Step 3: Add registry lookup by explicit names**
 
 In `src/ai_service_agent/tools/registry.py`, add this method to `ToolRegistry` immediately after `for_risk_level`:
 
@@ -198,7 +198,7 @@ from typing import Iterable, Optional
 
 Replace the existing `from typing import Optional` import rather than duplicating it.
 
-- [ ] **Step 4: Implement the route policy module**
+- [x] **Step 4: Implement the route policy module**
 
 Create `src/ai_service_agent/graph/route_policy.py`:
 
@@ -329,7 +329,7 @@ def tools_for_policy(registry: ToolRegistry, policy: RoutePolicy):
     return registry.tools_for_names(policy.allowed_tools)
 ```
 
-- [ ] **Step 5: Run the route-policy tests**
+- [x] **Step 5: Run the route-policy tests**
 
 Run:
 
@@ -339,7 +339,7 @@ uv run --no-sync pytest tests/test_route_policy.py -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/ai_service_agent/graph/route_policy.py src/ai_service_agent/tools/registry.py tests/test_route_policy.py
@@ -361,7 +361,7 @@ git commit -m "feat: add deterministic route intent policy"
 - Consumes: existing `Settings` and `get_settings.cache_clear()` behavior.
 - Produces: `Settings.route_intent_enabled`, `ROUTE_INTENT_SYSTEM`, and `route_intent_json_message(route_intent: str, confidence: float) -> AIMessage`.
 
-- [ ] **Step 1: Write the failing config and helper tests**
+- [x] **Step 1: Write the failing config and helper tests**
 
 Append to `tests/test_config.py`:
 
@@ -400,7 +400,7 @@ def test_route_intent_json_message_contract():
     }
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run:
 
@@ -410,7 +410,7 @@ uv run --no-sync pytest tests/test_config.py tests/test_route_intent_testing.py 
 
 Expected: FAIL because `route_intent_enabled` and `route_intent_json_message` do not exist.
 
-- [ ] **Step 3: Add the feature flag**
+- [x] **Step 3: Add the feature flag**
 
 In `src/ai_service_agent/config.py`, immediately after `jev_risk_confidence_threshold`, add:
 
@@ -422,7 +422,7 @@ In `src/ai_service_agent/config.py`, immediately after `jev_risk_confidence_thre
     )
 ```
 
-- [ ] **Step 4: Add the route-intent prompt**
+- [x] **Step 4: Add the route-intent prompt**
 
 In `src/ai_service_agent/prompts.py`, directly after `ROUTER_SYSTEM`, add:
 
@@ -454,7 +454,7 @@ ROUTE_INTENT_SYSTEM = """你是客服路由意图分类器。
 """
 ```
 
-- [ ] **Step 5: Add the offline Router helper**
+- [x] **Step 5: Add the offline Router helper**
 
 In `src/ai_service_agent/testing.py`, directly after `router_json_message`, add:
 
@@ -469,7 +469,7 @@ def route_intent_json_message(route_intent: str, confidence: float) -> AIMessage
     )
 ```
 
-- [ ] **Step 6: Update `.env.example`**
+- [x] **Step 6: Update `.env.example`**
 
 After the existing `JEV_RISK_CONFIDENCE_THRESHOLD` line, add:
 
@@ -478,7 +478,7 @@ After the existing `JEV_RISK_CONFIDENCE_THRESHOLD` line, add:
 JEV_ROUTE_INTENT_ENABLED=false
 ```
 
-- [ ] **Step 7: Run the tests**
+- [x] **Step 7: Run the tests**
 
 Run:
 
@@ -488,7 +488,7 @@ uv run --no-sync pytest tests/test_config.py tests/test_route_intent_testing.py 
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/ai_service_agent/config.py src/ai_service_agent/prompts.py src/ai_service_agent/testing.py .env.example tests/test_config.py tests/test_route_intent_testing.py
@@ -507,7 +507,7 @@ git commit -m "feat: add route intent router configuration"
 - Consumes: `ROUTE_INTENT_SYSTEM`, `Settings.route_intent_enabled`, `resolve_route_policy`, `route_intent_is_confident`.
 - Produces: `make_router(model)` behavior, when enabled, returning `{"route_intent": str, "confidence": float, "execution_status": "routing"}`; `_parse_route_intent_content(content) -> dict`; `_classify_route_intent_with_jev(client, state, settings) -> dict | None`.
 
-- [ ] **Step 1: Write failing Router tests**
+- [x] **Step 1: Write failing Router tests**
 
 Create `tests/test_route_intent_router.py`:
 
@@ -706,7 +706,7 @@ def test_feature_off_keeps_legacy_router(monkeypatch):
         get_settings.cache_clear()
 ```
 
-- [ ] **Step 2: Run Router tests and verify they fail**
+- [x] **Step 2: Run Router tests and verify they fail**
 
 Run:
 
@@ -716,7 +716,7 @@ uv run --no-sync pytest tests/test_route_intent_router.py -q
 
 Expected: FAIL because the feature flag path does not exist.
 
-- [ ] **Step 3: Implement the route-intent Router**
+- [x] **Step 3: Implement the route-intent Router**
 
 In `src/ai_service_agent/graph/router.py`, add these imports:
 
@@ -873,7 +873,7 @@ At the top of the existing `make_router`, immediately after `settings = get_sett
         return make_route_intent_router(model)
 ```
 
-- [ ] **Step 4: Run Router tests**
+- [x] **Step 4: Run Router tests**
 
 Run:
 
@@ -883,7 +883,7 @@ uv run --no-sync pytest tests/test_route_intent_router.py tests/test_router.py t
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ai_service_agent/graph/router.py tests/test_route_intent_router.py
@@ -903,7 +903,7 @@ git commit -m "feat: add jev route intent router"
 - Consumes: `RouteIntent`, `TargetGraph`, `ExecutionClass`.
 - Produces: state fields `route_intent`, `target_graph`, `execution_class`, `allowed_tools`, and `requires_approval`.
 
-- [ ] **Step 1: Write the failing state contract test**
+- [x] **Step 1: Write the failing state contract test**
 
 Create `tests/test_state_contract.py`:
 
@@ -921,7 +921,7 @@ def test_customer_service_state_declares_route_intent_fields():
     assert "requires_approval" in hints
 ```
 
-- [ ] **Step 2: Run the test and verify it fails**
+- [x] **Step 2: Run the test and verify it fails**
 
 Run:
 
@@ -931,7 +931,7 @@ uv run --no-sync pytest tests/test_state_contract.py -q
 
 Expected: FAIL because the fields are absent.
 
-- [ ] **Step 3: Update the state TypedDict**
+- [x] **Step 3: Update the state TypedDict**
 
 In `src/ai_service_agent/graph/state.py`, after `risk_level`, add:
 
@@ -947,7 +947,7 @@ In `src/ai_service_agent/graph/state.py`, after `risk_level`, add:
     requires_approval: bool
 ```
 
-- [ ] **Step 4: Update state spec**
+- [x] **Step 4: Update state spec**
 
 In `docs/specs/state-spec.md`, in the `CustomerServiceState` code block after `risk_level`, add:
 
@@ -967,7 +967,7 @@ Below the existing rules, add:
 - 旧 `capability` / `risk_level` 字段仅在 Router v1 路径继续使用；v2 路径不得依赖它们做路由。
 ```
 
-- [ ] **Step 5: Run the test**
+- [x] **Step 5: Run the test**
 
 Run:
 
@@ -977,7 +977,7 @@ uv run --no-sync pytest tests/test_state_contract.py -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/ai_service_agent/graph/state.py docs/specs/state-spec.md tests/test_state_contract.py
@@ -996,7 +996,7 @@ git commit -m "feat: add route intent state contract"
 - Consumes: `resolve_route_policy`, `Settings.route_intent_enabled`, and state fields from Task 4.
 - Produces: `_policy_gate(state) -> dict`, which returns a route-policy update when enabled; `_route_target(state) -> str`, which consumes `state["target_graph"]`.
 
-- [ ] **Step 1: Write failing Policy Gate tests**
+- [x] **Step 1: Write failing Policy Gate tests**
 
 Create `tests/test_route_intent_policy_gate.py`:
 
@@ -1069,7 +1069,7 @@ def _route_target_legacy():
     return _route_target({"capability": "unknown", "risk_level": "read"})
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run:
 
@@ -1079,7 +1079,7 @@ uv run --no-sync pytest tests/test_route_intent_policy_gate.py -q
 
 Expected: FAIL because Policy does not yet map route intent.
 
-- [ ] **Step 3: Implement route-intent Policy Gate**
+- [x] **Step 3: Implement route-intent Policy Gate**
 
 In `src/ai_service_agent/graph/builder.py`, add:
 
@@ -1114,7 +1114,7 @@ def _policy_gate(state: dict) -> dict:
     }
 ```
 
-- [ ] **Step 4: Run Policy Gate tests**
+- [x] **Step 4: Run Policy Gate tests**
 
 Run:
 
@@ -1124,7 +1124,7 @@ uv run --no-sync pytest tests/test_route_intent_policy_gate.py tests/test_builde
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ai_service_agent/graph/builder.py tests/test_route_intent_policy_gate.py
@@ -1143,7 +1143,7 @@ git commit -m "feat: wire route intent into deterministic policy"
 - Consumes: state field `allowed_tools`.
 - Produces: `AllowedToolsMiddleware`, `make_allowed_tool_boundary_wrapper_sync(next_wrapper=None)`, and `make_allowed_tool_boundary_wrapper_async(next_wrapper=None)`.
 
-- [ ] **Step 1: Write failing middleware and wrapper tests**
+- [x] **Step 1: Write failing middleware and wrapper tests**
 
 Create `tests/test_allowed_tools.py`:
 
@@ -1249,7 +1249,7 @@ def test_tool_boundary_allows_tool_and_calls_next_wrapper():
     assert result == "executed"
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run:
 
@@ -1259,7 +1259,7 @@ uv run --no-sync pytest tests/test_allowed_tools.py -q
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the allowed-tools middleware and wrappers**
+- [x] **Step 3: Implement the allowed-tools middleware and wrappers**
 
 Create `src/ai_service_agent/graph/allowed_tools.py`:
 
@@ -1354,7 +1354,7 @@ def make_allowed_tool_boundary_wrapper_async(next_wrapper=None):
     return wrapper
 ```
 
-- [ ] **Step 4: Run allowed-tools tests**
+- [x] **Step 4: Run allowed-tools tests**
 
 Run:
 
@@ -1364,7 +1364,7 @@ uv run --no-sync pytest tests/test_allowed_tools.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ai_service_agent/graph/allowed_tools.py tests/test_allowed_tools.py
@@ -1386,7 +1386,7 @@ git commit -m "feat: add policy allowed tools boundary"
 - Consumes: `AllowedToolsMiddleware`, `make_allowed_tool_boundary_wrapper_sync`, `make_allowed_tool_boundary_wrapper_async`, and state field `allowed_tools`.
 - Produces: model-visible and executable tool sets narrowed by Policy.
 
-- [ ] **Step 1: Write failing execution-boundary tests**
+- [x] **Step 1: Write failing execution-boundary tests**
 
 Create `tests/test_allowed_tools_execution.py`:
 
@@ -1455,7 +1455,7 @@ def test_mutation_select_prompt_only_contains_allowed_tools():
     assert out["context"]["pending_tool"]["tool"] == "update_phone"
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run:
 
@@ -1465,7 +1465,7 @@ uv run --no-sync pytest tests/test_allowed_tools_execution.py -q
 
 Expected: FAIL because select does not consume `allowed_tools`.
 
-- [ ] **Step 3: Filter model-visible tools in ReadGraph**
+- [x] **Step 3: Filter model-visible tools in ReadGraph**
 
 In `src/ai_service_agent/graph/agents/read_agent.py`, add:
 
@@ -1488,7 +1488,7 @@ class ReadAgentState(TypedDict):
     allowed_tools: list[str]
 ```
 
-- [ ] **Step 4: Filter write-path select prompts and validation**
+- [x] **Step 4: Filter write-path select prompts and validation**
 
 In `src/ai_service_agent/graph/workflows/select.py`, replace the single `lines` construction inside `make_select_node` with a reusable map:
 
@@ -1534,7 +1534,7 @@ After `meta` is resolved and before the existing `if tool_name not in allowed:` 
             return _reject(state, "tool_not_allowed")
 ```
 
-- [ ] **Step 5: Enforce the boundary at write-path ToolNode execution**
+- [x] **Step 5: Enforce the boundary at write-path ToolNode execution**
 
 In both `src/ai_service_agent/graph/workflows/mutation_agent.py` and `src/ai_service_agent/graph/workflows/high_risk_agent.py`, add:
 
@@ -1562,7 +1562,7 @@ Replace the existing `ToolNode(...)` construction in each file:
     )
 ```
 
-- [ ] **Step 6: Run execution-boundary and existing graph tests**
+- [x] **Step 6: Run execution-boundary and existing graph tests**
 
 Run:
 
@@ -1572,7 +1572,7 @@ uv run --no-sync pytest tests/test_allowed_tools_execution.py tests/test_mutatio
 
 Expected: PASS. If `tests/test_read_graph.py` does not exist, run `uv run --no-sync pytest tests -k "read_agent or read_graph" -q`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/ai_service_agent/graph/allowed_tools.py src/ai_service_agent/graph/agents/read_agent.py src/ai_service_agent/graph/workflows/select.py src/ai_service_agent/graph/workflows/mutation_agent.py src/ai_service_agent/graph/workflows/high_risk_agent.py tests/test_allowed_tools_execution.py
@@ -1590,7 +1590,7 @@ git commit -m "feat: enforce route policy tool boundaries"
 - Consumes: route-intent Router, Policy Gate, state fields, and ReadGraph.
 - Produces: integration proof that `route_intent` routes to the expected graph without consuming old `capability` / `risk_level`.
 
-- [ ] **Step 1: Write the failing end-to-end tests**
+- [x] **Step 1: Write the failing end-to-end tests**
 
 Create `tests/test_route_intent_graph.py`:
 
@@ -1665,7 +1665,7 @@ def test_route_intent_graph_routes_unsupported_to_fallback(enabled):
     assert out["execution_status"] == "completed"
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run:
 
@@ -1675,11 +1675,11 @@ uv run --no-sync pytest tests/test_route_intent_graph.py -q
 
 Expected: FAIL before Task 5 and Task 7 are complete; after those tasks, this test should expose only integration mismatches.
 
-- [ ] **Step 3: Fix integration mismatches only**
+- [x] **Step 3: Fix integration mismatches only**
 
 Do not change the contract. If the test fails because a subgraph resets `target_graph` or `allowed_tools`, adjust only the offending state write so Policy-derived fields remain visible after the turn.
 
-- [ ] **Step 4: Run the end-to-end tests**
+- [x] **Step 4: Run the end-to-end tests**
 
 Run:
 
@@ -1689,7 +1689,7 @@ uv run --no-sync pytest tests/test_route_intent_graph.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_route_intent_graph.py
@@ -1709,7 +1709,7 @@ git commit -m "test: cover route intent graph integration"
 - Consumes: implemented behavior from Tasks 1–8.
 - Produces: authoritative documentation matching the feature-flagged v2 contract.
 
-- [ ] **Step 1: Update graph-spec Router and Policy sections**
+- [x] **Step 1: Update graph-spec Router and Policy sections**
 
 In `docs/specs/graph-spec.md`, replace the Router and Policy summaries with:
 
@@ -1736,7 +1736,7 @@ In `docs/specs/graph-spec.md`, replace the Router and Policy summaries with:
 - 未注册 intent、`unsupported_action`、`unknown` 一律 fallback。
 ```
 
-- [ ] **Step 2: Update tool-spec allowed-tools section**
+- [x] **Step 2: Update tool-spec allowed-tools section**
 
 In `docs/specs/tool-spec.md`, after the existing risk-level injection rules, add:
 
@@ -1751,7 +1751,7 @@ In `docs/specs/tool-spec.md`, after the existing risk-level injection rules, add
 - 现有 risk-tier 校验、schema 校验、业务预检、审批和 recheck 全部保留。
 ```
 
-- [ ] **Step 3: Verify environment docs**
+- [x] **Step 3: Verify environment docs**
 
 Confirm `.env.example` contains:
 
@@ -1759,7 +1759,7 @@ Confirm `.env.example` contains:
 JEV_ROUTE_INTENT_ENABLED=false
 ```
 
-- [ ] **Step 4: Run full regression**
+- [x] **Step 4: Run full regression**
 
 Run:
 
@@ -1769,7 +1769,7 @@ uv run --no-sync pytest -q
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/specs/graph-spec.md docs/specs/tool-spec.md .env.example
@@ -1788,7 +1788,7 @@ git commit -m "docs: define route intent policy contract"
 - Consumes: `make_router`, `ROUTE_POLICY`, `route_intent_json_message`, and the new eval dataset.
 - Produces: reproducible offline accuracy/latency report for the DeepSeek route-intent path.
 
-- [ ] **Step 1: Add the deterministic eval dataset**
+- [x] **Step 1: Add the deterministic eval dataset**
 
 Create `tests/evals/router_benchmark/route_intent.jsonl`:
 
@@ -1815,7 +1815,7 @@ Create `tests/evals/router_benchmark/route_intent.jsonl`:
 {"id":"RI-020","input":"帮我把那个东西处理一下","expected_route_intent":"unknown"}
 ```
 
-- [ ] **Step 2: Add the offline eval script**
+- [x] **Step 2: Add the offline eval script**
 
 Create `scripts/eval_route_intent.py`:
 
@@ -1905,7 +1905,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 3: Run the offline eval**
+- [x] **Step 3: Run the offline eval**
 
 Run:
 
@@ -1915,7 +1915,7 @@ uv run --no-sync python scripts/eval_route_intent.py
 
 Expected: the script completes and writes `scripts/route_intent_eval_results.json`. Do not tune thresholds in this task; record the baseline result for review.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/evals/router_benchmark/route_intent.jsonl scripts/eval_route_intent.py scripts/route_intent_eval_results.json
@@ -1933,7 +1933,7 @@ git commit -m "test: add route intent evaluation baseline"
 - Consumes: all prior tasks.
 - Produces: regression evidence for both feature-flag states.
 
-- [ ] **Step 1: Run full regression with the feature disabled**
+- [x] **Step 1: Run full regression with the feature disabled**
 
 Run:
 
@@ -1943,7 +1943,7 @@ $env:JEV_ROUTE_INTENT_ENABLED="false"; uv run --no-sync pytest -q
 
 Expected: all tests pass; legacy Router behavior is unchanged.
 
-- [ ] **Step 2: Run targeted regression with the feature enabled**
+- [x] **Step 2: Run targeted regression with the feature enabled**
 
 Run:
 
@@ -1953,7 +1953,7 @@ $env:JEV_ROUTE_INTENT_ENABLED="true"; uv run --no-sync pytest tests/test_route_p
 
 Expected: all tests pass.
 
-- [ ] **Step 3: Run eval suite**
+- [x] **Step 3: Run eval suite**
 
 Run:
 
@@ -1964,7 +1964,7 @@ uv run --no-sync python scripts/eval_route_intent.py
 
 Expected: existing eval tests pass and the route-intent eval report is regenerated.
 
-- [ ] **Step 4: Review feature-flag safety**
+- [x] **Step 4: Review feature-flag safety**
 
 Check all four points before completion:
 
@@ -1984,7 +1984,7 @@ Verify:
 4. Policy remains the only source of target_graph/execution_class/allowed_tools/requires_approval.
 ```
 
-- [ ] **Step 5: Final commit if docs or generated report changed**
+- [x] **Step 5: Final commit if docs or generated report changed**
 
 ```bash
 git status --short
@@ -1993,3 +1993,4 @@ git commit -m "chore: finalize route intent verification"
 ```
 
 If there is nothing to commit, record that explicitly in the execution summary.
+
