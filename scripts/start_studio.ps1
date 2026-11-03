@@ -37,8 +37,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-# Monorepo git root is parent of "AI Service Agent"
-$GitRoot = (Resolve-Path (Join-Path $ProjectRoot "..")).Path
+# Repo root is now the project directory itself (single repo, not a monorepo)
+$GitRoot = $ProjectRoot
 $overlayDir = $null
 
 Set-Location $ProjectRoot

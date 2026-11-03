@@ -16,9 +16,6 @@ jobs:
   offline-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: AI Service Agent
     env:
       JEV_ENABLED: "false"
       JEV_ROUTE_INTENT_ENABLED: "false"
