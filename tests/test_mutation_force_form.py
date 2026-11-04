@@ -59,6 +59,11 @@ def test_unique_mutation_tool_maps_address_phrases(text):
         ("申请售后", "create_service_ticket"),
         ("开售后工单", "create_service_ticket"),
         ("我要申请售后", "create_service_ticket"),
+        ("开个售后", "create_service_ticket"),
+        ("帮我开个售后", "create_service_ticket"),
+        ("提交个售后", "create_service_ticket"),
+        ("开售后", "create_service_ticket"),
+        ("提交售后", "create_service_ticket"),
     ],
 )
 def test_unique_mutation_tool_maps_other_write_phrases(text, tool):
