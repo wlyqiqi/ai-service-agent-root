@@ -49,6 +49,47 @@ uv run ai-service-agent
 uv run python scripts/real_model_http_smoke.py
 ```
 
+## 本地演示（v2 + Chatwoot + LangSmith）
+
+Agent 使用项目 `.venv` 启动，Chatwoot 继续由独立 Docker Compose 启动。演示页使用 `web/landing-v2.html`，并通过 Chatwoot Widget 进入真实 AI 客服链路；LangSmith 接收真实模型运行 trace。
+
+前置条件：
+
+- Chatwoot 已运行在 `http://localhost:3000`。
+- Chatwoot 与 Sidekiq 已设置 `SAFE_FETCH_ALLOW_PRIVATE_NETWORK=true`。
+- `.env` 中 `FAKE_MODEL=false`，并配置真实模型凭证。
+- `.env` 中配置完整 `CHATWOOT_*` 参数，且 `CHATWOOT_BASE_URL=http://localhost:3000`。
+- Chatwoot AgentBot outgoing URL 指向 `http://host.docker.internal:8766/webhooks/agent_bot`。
+- Chatwoot Account Webhook 指向 `http://host.docker.internal:8766/webhooks/chatwoot`。
+- `.env` 设置 `LANGSMITH_TRACING=true` 和 `LANGSMITH_API_KEY`；未设置项目名时脚本使用 `ai-service-agent-local`。开启 tracing 会将对话、模型输入输出上传到 LangSmith，演示语料需确认可外发。
+
+启动与停止：
+
+```powershell
+.\scripts\start_demo.ps1
+.\scripts\stop_demo.ps1
+```
+
+启动脚本会校验模型、Chatwoot 和 LangSmith 配置，检查 Account Webhook，然后启动服务并打开：
+
+```text
+http://127.0.0.1:8766/landing-v2.html
+```
+
+如果 `host.docker.internal` 不可用，传入 Chatwoot 容器可访问的宿主机地址：
+
+```powershell
+.\scripts\start_demo.ps1 -RuntimeBase "http://192.168.x.x:8766"
+```
+
+暂时不检查 Chatwoot Webhook 时：
+
+```powershell
+.\scripts\start_demo.ps1 -SkipChatwootWebhookCheck
+```
+
+运行日志写入 `tmp/demo-runtime.log` 和 `tmp/demo-runtime.err.log`，PID 写入 `tmp/demo-runtime.pid`。默认端口 `8766` 与当前 Chatwoot webhook 一致，可用 `-Port` 覆盖。不要直接用浏览器打开 `web/landing-v2.html` 文件路径，否则 Widget 与相对 API 地址无法正常工作。
+
 ## 测试与评估
 
 ```powershell
