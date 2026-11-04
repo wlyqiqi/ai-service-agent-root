@@ -65,7 +65,14 @@ _INVOICE_RE = re.compile(
     r")"
 )
 _TICKET_RE = re.compile(
-    _NOT_NEGATED + r"(?:申请售后|开售后工单|提交售后|发起售后|办理售后|办售后|售后工单|要售后)"
+    _NOT_NEGATED
+    + r"(?:"
+    r"申请售后"
+    r"|开售后工单"
+    r"|开(?:一下|一张|一份|个|张|份|下)?售后"
+    r"|提交(?:一下|个|张|份|下)?售后"
+    r"|发起售后|办理售后|办售后|售后工单|要售后"
+    r")"
 )
 
 # First-version table. A hit counts only when the tool is on the current allowlist.
