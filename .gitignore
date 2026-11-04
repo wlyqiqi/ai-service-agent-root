@@ -29,3 +29,7 @@ _diag_*.py
 # Root-level dev artifacts
 high-risk-select-node.bundle
 high-risk-select-node.patch
+
+# Generated artifacts (runtime / tooling output)
+.claude/
+*.visual-check.*
