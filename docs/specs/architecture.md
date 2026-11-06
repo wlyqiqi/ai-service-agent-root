@@ -22,7 +22,10 @@ FastAPI (REST + SSE/WS, 仅传输层)
 Conversation Runtime（入口层，轻量 conversation_status）
    |  conversation_mode == human ? -> 人工车道（写 Message Store + 通知坐席，不触图）
    |  conversation_mode == ai      -> 进入 CustomerServiceGraph
-   |  接收子图 interrupt(handoff_request) -> 建 Handoff Record + 原子切 mode=human + 发 handoff_created
+   |  decide_entry（确定性前置）: request / cancel -> 外层 Handoff 生命周期（不触图/checkpointer）
+   |  普通 AI 消息 -> 进入 CustomerServiceGraph
+   |  接收子图 interrupt(handoff_request) -> 建/复用 awaiting_seat + handoff_requested（mode 仍为 ai）
+   |  Seat Takeover（open + User assignee）-> 激活 Handoff + 原子切 mode=human + 发 handoff_created
    |  人工 Resolve -> mode=ai + 发 handoff_resolved
    |  发送 AI 回复前最终校验 mode == ai（实时值，非生成时刻值）
    v
@@ -41,9 +44,10 @@ CustomerServiceGraph (LangGraph 总图, SQLite Checkpointer)
    +- read      -> ReadGraph      (ReAct agent + 只读工具, 无业务 interrupt)
    +- mutation  -> MutationGraph  (select -> 预检 -> Form Interrupt -> Form Resume -> 执行)
    +- high_risk -> HighRiskGraph  (select -> 预检/Form -> interrupt 人工审批 -> 执行/拒绝)
+    +- complaint -> ComplaintGraph  (安抚 + 询问转人工, 不挂 fallback)
    +- fallback  -> Concierge 兜底 agent
    |
-   +- 任意子图检测到转人工信号 -> interrupt(handoff_request) -> 外层接管（见上）
+    +- Read / Mutation / HighRisk / Fallback 检测到转人工信号 -> interrupt(handoff_request) -> 外层接管（见上）
    |
    v
 Final Response (写回 messages, 统一出口 + 归一化事件)
@@ -168,15 +172,15 @@ docs/                     # project-audit.md + specs/
 
 | 状态机 | 取值 | 存储位置 | 管理位置 | 转移触发 |
 |---|---|---|---|---|
-| `conversation_mode` | `ai` / `human` | 轻量 `conversation_status`（独立表/Redis key，`conversation_id → mode`） | **入口层**（Conversation Runtime），不进 LangGraph | `ai→human`：收 `interrupt(handoff_request)` 后与建 Handoff Record **同一事务**原子切换；`human→ai`：人工 Resolve（前置校验 pending 审批仍有效；**审批归宿**不再是「继续挂起等 AI」——Seat Approver / Approval Side-Channel，见 [ADR-0002](../adr/0002-seat-approver-side-channel.md)；`handoff-spec.md` §1.3 / §5.1 归宿段已 supersede） |
+| `conversation_mode` | `ai` / `human` | 轻量 `conversation_status`（独立表/Redis key，`conversation_id → mode`） | **入口层**（Conversation Runtime），不进 LangGraph | `ai→human`：Handoff Request 只创建/复用 `awaiting_seat` 挂起（mode 仍为 `ai`）；Chatwoot 队列 round-robin 后由 Seat Takeover（`open + User assignee`）与激活 Handoff Record **同一事务**切 `human`；`human→ai`：人工 Resolve（前置校验 pending 审批仍有效；审批归宿见 [ADR-0002](../adr/0002-seat-approver-side-channel.md)） |
 | `execution_status` | 9 值（`idle…waiting_handoff…failed`） | LangGraph **State 内字段**，随 checkpoint 持久化 | **图内**（Router / 子图 / `final` 按 turn 阶段置位） | `check_handoff` 抛 `handoff_request` 前置 `waiting_handoff`；Resolve 后由入口层 `Command(resume=...)` 续接子图，最终由 `final` 置 `completed` |
 | 审批状态 | `pending / approved / rejected / expired` | Approval Service（轻量状态存储，同 `conversation_status` 定位） | 状态存储在外置服务（惰性过期）；**业务决策在图内** | 图发起 interrupt；HTTP 端点前置校验后 `Command(resume=...)` 恢复（见 `approval-spec.md` §3） |
-| Handoff 生命周期 | `created → 接管中 → resolved` | `handoff_record` 表 | **外层**创建 / resolve，与 mode 切换同事务 | 子图 `interrupt(handoff_request)` → 外层建 Record + 切 mode + `handoff_created`；`POST /handoffs/{id}/resolve` → `handoff_resolved` |
+| Handoff 生命周期 | `awaiting_seat → active → resolved` | `handoff_record` 表 | **外层**创建请求 / 激活 / resolve；Seat Takeover 与 mode 切换同事务 | 子图 `interrupt(handoff_request)` → 外层创建/复用 `awaiting_seat` + `handoff_requested`（不切 mode）；Seat Takeover → `active` + `handoff_created`；Resolve → `resolved` + `handoff_resolved` |
 
 - **入口闸门**（`conversation_mode`）只回答"这条消息 AI 能不能碰"，不关心图内进度；判断必须轻量（见 `handoff-spec.md` §2）。
 - **图内进度**（`execution_status`）回答"本 turn 走到哪一步"，随 checkpoint 落库；转人工时置 `waiting_handoff`，与 `mode` **分层但语义一致**（分属 checkpoint 与外层表，非同一事务）。
 - **审批状态**只由服务持久化，业务决策全在图内；MVP 第一公里未纳入（见 `mvp-first-mile.md` §2）。
-- **Handoff Record** 创建与 `mode` 切换为**同一事务**（`handoff-spec.md` §1.2 的原子性）。
+- **Seat Takeover 激活 Handoff Record** 与 `mode=human` 切换为**同一事务**；Handoff Request 创建本身只写 `awaiting_seat`，不切 mode（`handoff-spec.md` §1.2 的原子性）。
 - 全景观图：`docs/diagrams/state-machines.html`。
 
 ## 12. Order 数据边界（2026-10-10）
