@@ -42,9 +42,10 @@ CustomerServiceGraph (LangGraph 总图, SQLite Checkpointer)
    +- read      -> ReadGraph      (ReAct agent + 只读工具, 无业务 interrupt)
    +- mutation  -> MutationGraph  (select -> 预检 -> Form Interrupt -> Form Resume -> 执行)
    +- high_risk -> HighRiskGraph  (select -> 预检/Form -> interrupt 人工审批 -> 执行/拒绝)
+    +- complaint -> ComplaintGraph  (安抚 + 询问转人工, 不挂 fallback)
    +- fallback  -> Concierge 兜底 agent
    |
-   +- 任意子图检测到转人工信号 -> interrupt(handoff_request) -> 外层接管（见上）
+    +- Read / Mutation / HighRisk / Fallback 检测到转人工信号 -> interrupt(handoff_request) -> 外层接管（见上）
    |
    v
 Final Response (写回 messages, 统一出口 + 归一化事件)

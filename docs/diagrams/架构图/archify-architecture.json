@@ -40,14 +40,13 @@
         "id": "high-risk-path",
         "label": "审批",
         "focus": [
-          "seat",
           "fastapi",
           "runtime",
           "high_risk_graph",
           "state",
           "graph"
         ],
-        "note": "坐席经独立审批旁路决定，不把 conversation_mode 切成 human。"
+        "note": "HighRisk 审批经独立旁路恢复，不切换 conversation_mode。"
       },
       {
         "id": "complaint-path",
@@ -58,7 +57,6 @@
           "runtime",
           "graph",
           "complaint_graph",
-          "fallback",
           "seat",
           "state"
         ],
@@ -412,7 +410,7 @@
       "title": "入口与会话",
       "items": [
         "Widget → AgentBot；human 只写 Message Store，Seat Takeover 后才切 mode",
-        "thread 惰性创建、有界水合；pending interrupt 固定 thread，ThreadReaper 在完成边界轮换/清理"
+        "thread 惰性创建、有界水合；新 turn 前安全轮换，ThreadReaper 清理 idle/queued thread"
       ]
     },
     {
