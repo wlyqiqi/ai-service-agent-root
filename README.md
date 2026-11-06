@@ -1,132 +1,206 @@
 # AI Service Agent
 
-基于 LangGraph 的 AI 客服系统：**确定性工作流 + 智能体混合架构**，按操作风险分层（Read / Mutation / HighRisk），配套完整 harness（FastAPI 网关、审批、事件、会话、观测）。
+[![CI](https://github.com/wlyqiqi/ai-service-agent-root/actions/workflows/ci.yml/badge.svg)](https://github.com/wlyqiqi/ai-service-agent-root/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-blue.svg)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agent%20Harness-1C3C3C.svg)](https://www.langchain.com/langgraph)
 
-> 里程碑：`v0.1.0`（P0–P5 全量落地）· 当前 693 passed / 2 skipped（`pytest tests --ignore=tests/evals`）· `langgraph validate` valid · 真机冒烟通过
+## 项目定位与状态
 
-## 架构概览
+面向电商客服的 **Agent Harness（可运行参考实现）**。LLM 负责理解，确定性工作流负责权限、执行与恢复；关键写操作必须经过结构化表单或人工审批，高风险操作与人工接管保持独立的安全边界。
 
-```
-FastAPI Transport（REST / SSE，只做 Transport）
-  └─ Conversation Runtime（conversation_mode 入口层判断：ai / human）
-       └─ LangGraph CustomerServiceGraph
-            ├─ Guard ∥ Router（并行；Router 结构化输出 route_intent + confidence，不执行工具）
-            ├─ Policy Gate（route_intent → target_graph / allowed_tools / requires_approval，不调 LLM）
-            ├─ Select + Safety Precheck / Mutation Form Interrupt（写操作）
-            ├─ 子图：ReadGraph(ReAct) / MutationGraph(显式 Workflow) / HighRiskGraph(人工审批)
-            └─ Checkpointer（SQLite，thread_id）· interrupt / resume
-Harness：Approval Service · Handoff Service · Message Store · Conversation Status Store · 事件协议
-```
+这里的 **Harness** 指包裹模型的运行时边界：FastAPI Transport、LangGraph 编排、Policy、Approval、Handoff、State、Thread Lifecycle 与可观测性。
 
-## 技术栈
+> **状态：`v0.1.0` / Demo**
+>
+> 适合架构参考、本地演示与二次开发，不作为生产 SLA 或开箱即用的通用客服 SaaS 承诺。
 
-- Python 3.14 · LangGraph 1.2.10 · langchain-core 1.5.3 · langchain-openai 1.4.1
-- 模型：火山方舟 ARK（OpenAI 兼容，`.env` 配置）
-- FastAPI + SSE（sse-starlette）· SQLite checkpointer（`AsyncSqliteSaver`）· pytest / httpx
+![Chatwoot Mutation Form 演示](docs/assets/readme/demo-form.png)
 
-## 快速开始
+_演示：用户在 Chatwoot Widget 中发起地址修改，系统通过 Form Interrupt 收集结构化字段，确认后才进入写路径。图片使用虚构演示数据。_
+
+## 核心价值与差异化
+
+- **Deterministic authority**：LLM 只负责理解，Guard、Policy Gate、Safety Precheck、属主校验和审批状态由确定性代码决定。
+- **风险分层执行**：Read、Mutation、HighRisk、Complaint、Fallback 使用不同子图与工具边界，不做“万能 Agent”。
+- **人工审批与接管是一等能力**：HighRisk 走独立审批旁路；转人工采用 Seat-gated Handoff，申请不会直接切 `human`，只有 **Seat Takeover** 才真正进入人工车道。
+- **可恢复、可观测**：官方 `interrupt` / `Command(resume=...)`、SQLite checkpointer、Thread Lifecycle、SSE 事件和 Harness hooks 共同组成完整运行链路。
+
+适用场景：
+
+- 需要展示 HITL（Human-in-the-loop）Agent 架构的工程作品集。
+- 需要评估 LangGraph 中表单中断、审批恢复、人工接管和风险分层设计的团队。
+- 希望以确定性边界约束 LLM 工具调用的客服自动化原型。
+
+不适用场景：
+
+- 需要多租户、生产级 SLA、横向扩展或托管客服平台的项目。
+- 只需要普通 RAG 问答、没有写操作或人工审批需求的聊天机器人。
+- 希望让 LLM 自由决定权限、金额、审批或数据边界的系统。
+
+## 演示
+
+主演示链路：
+
+1. 用户要求修改收货地址，Router 与 Policy 将请求路由到 Mutation。
+2. Mutation Select 绑定写工具，随后发出 `form_required` Form Interrupt。
+3. 用户提交表单，Transport 转为 `Command(resume=...)`，在同一 `thread_id` 上恢复。
+4. 工具只执行一次，最终以 `tool_call`、`tool_result` 和 `done` 收尾。
+
+另外三条关键链路：
+
+- **HighRisk**：退款/取消订单先预检，再发出 `approval_required`；坐席通过审批旁路恢复，执行前重新校验，不切换 `conversation_mode`。
+- **Handoff**：用户显式转人工或投诉确认后发出 `handoff_requested`；坐席 Takeover 后才发 `handoff_created` 并切到 `human`；Resolve 后发 `handoff_resolved` 回到 AI。
+- **Complaint / Fallback**：投诉先安抚并询问是否转人工；无法归类或低置信度进入 Fallback。
+
+## 架构
+
+![AI Service Agent 架构图](docs/assets/readme/architecture.png)
+
+[打开交互式架构图](docs/diagrams/架构图/archify-architecture.html)
+
+核心分层：
+
+- **Transport**：FastAPI 只处理 REST、SSE、Webhook、审批 HTTP 和 Chatwoot 适配。
+- **Conversation Runtime**：入口层判断 `conversation_mode=ai|human`，管理 pending interrupt、thread 生命周期与 resume。
+- **LangGraph**：Guard ∥ Router → Policy → Read / Mutation / HighRisk / Complaint / Fallback 子图。
+- **State & Tools**：业务工具、订单读写、SQLite checkpointer、消息、审批、Handoff 与 Thread Store 分职责存放。
+- **Harness hooks**：事件、观测、审计和工具执行前后横切逻辑，不写进 Agent / 工具循环内部。
+
+## Quick Start
+
+### 1. 安装依赖
+
+需要 Python 3.14 与 [uv](https://docs.astral.sh/uv/)。
 
 ```powershell
-# 1) 安装依赖（含 dev 组）
 uv sync --group dev
-
-# 2) 配置环境变量
-copy .env.example .env   # 填入 ARK_API_KEY / ARK_BASE_URL / ARK_MODEL
-
-# 3) 启动服务（127.0.0.1:8000；配置 fake_model=true 时使用离线 fake model）
-uv run ai-service-agent
-
-# 4) LangGraph Studio（默认 checkout/pull main；日常脏工作区请加 -SkipGit）
-.\scripts\start_studio.ps1
-#    -SkipGit      保持当前分支/改动（脏工作区时不加会直接拒绝切分支）
-#    -Tracing      临时 dotenv 覆盖 LANGSMITH_TRACING=true（不改仓库 .env；走 langgraph.json 的 env 通道）
-#    -WithApp      同时启动 FastAPI runtime :8000
-#    -OpenBrowser  启动后自动拉起浏览器
-#    -Port 2025    端口被占用时换一个（脚本会先检测占用并报出 PID）
-# 使用项目 .venv 的 langgraph-cli（uv sync --group dev）；勿依赖全局 langgraph。
-
-# 5) 真实模型 SSE 冒烟（FAQ / Mutation / HighRisk / Handoff / Clarify 五场景）
-uv run python scripts/real_model_http_smoke.py
 ```
 
-## 本地演示（v2 + Chatwoot + LangSmith）
+### 2. 准备离线模拟数据
 
-Agent 使用项目 `.venv` 启动，Chatwoot 继续由独立 Docker Compose 启动。演示页使用 `web/landing-v2.html`，并通过 Chatwoot Widget 进入真实 AI 客服链路；LangSmith 接收真实模型运行 trace。
+```powershell
+uv run python scripts/seed_mock_db.py
+```
 
-前置条件：
+### 3. 使用 fake model 启动
 
-- Chatwoot 已运行在 `http://localhost:3000`。
-- Chatwoot 与 Sidekiq 已设置 `SAFE_FETCH_ALLOW_PRIVATE_NETWORK=true`。
-- `.env` 中 `FAKE_MODEL=false`，并配置真实模型凭证。
-- `.env` 中配置完整 `CHATWOOT_*` 参数，且 `CHATWOOT_BASE_URL=http://localhost:3000`。
-- Chatwoot AgentBot outgoing URL 指向 `http://host.docker.internal:8766/webhooks/agent_bot`。
-- Chatwoot Account Webhook 指向 `http://host.docker.internal:8766/webhooks/chatwoot`。
-- `.env` 设置 `LANGSMITH_TRACING=true` 和 `LANGSMITH_API_KEY`；未设置项目名时脚本使用 `ai-service-agent-local`。开启 tracing 会将对话、模型输入输出上传到 LangSmith，演示语料需确认可外发。
+Windows PowerShell：
 
-启动与停止：
+```powershell
+$env:FAKE_MODEL = "true"
+$env:AUTH_ENABLED = "false"
+uv run ai-service-agent
+```
+
+macOS / Linux：
+
+```bash
+FAKE_MODEL=true AUTH_ENABLED=false uv run ai-service-agent
+```
+
+服务默认监听 `http://127.0.0.1:8000`。验证启动：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/config
+```
+
+### 4. 完整本地演示
+
+完整演示需要 Chatwoot、真实模型凭证和可选 LangSmith tracing：
 
 ```powershell
 .\scripts\start_demo.ps1
 .\scripts\stop_demo.ps1
 ```
 
-启动脚本会校验模型、Chatwoot 和 LangSmith 配置，检查 Account Webhook，然后启动服务并打开：
+前置配置、Webhook 与故障排查见 [`docs/ops/chatwoot-widget-agentbot-setup.md`](docs/ops/chatwoot-widget-agentbot-setup.md) 和 [`.env.example`](.env.example)。
+
+## 核心流程
+
+| 流程 | 典型输入 | 控制点 | 主要事件 / 恢复方式 |
+|---|---|---|---|
+| Read | “查一下我的订单” | Guard / Router / Policy → ReadGraph | `tool_call` → `tool_result` → `done` |
+| Mutation | “把收货地址改成…” | Mutation Select → Form Interrupt → Resume | `form_required` / `form_rejected` → 确认后写库 → `done` |
+| HighRisk | “订单 10086 申请退款” | Safety Precheck → Seat Approval → 执行前重校验 | `approval_required` → 审批旁路 `resume` → 工具只执行一次 |
+| Handoff | “转人工”或投诉确认 | Seat-gated Handoff | `handoff_requested` → Seat Takeover → `handoff_created` → `human` → `handoff_resolved` |
+| Complaint / Fallback | 投诉、低置信度、unknown | ComplaintGraph / FallbackGraph | 先安抚或给出兜底，不自动越过人工边界 |
+
+关键不变量：
+
+- Form Interrupt 挂起期间纯文本不得写库；恢复必须使用官方 `Command(resume=...)`。
+- HighRisk 的人工审批与人工接管是不同语义：审批不自动切 `human`，Seat Takeover 才切人工车道。
+- `conversation_mode` 两态；`thread_id` 是独立 checkpoint 标识。
+- 每个 turn 以 `done` 结束；错误也要先发 `error` 再发 `done`。
+
+## API 与 SSE
+
+最小 REST 流程：
+
+```powershell
+# 创建会话
+$session = Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/sessions `
+  -ContentType application/json `
+  -Body '{"user_id":"demo-user"}'
+
+$session.session_id
+```
+
+发起对话并消费 SSE：
+
+```bash
+curl -N -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"<session_id>","message":"查订单状态"}'
+```
+
+事件统一为 `{ "type": string, "data": object }`：
 
 ```text
-http://127.0.0.1:8766/landing-v2.html
+data: {"type":"token","data":{"text":"..."}}
+data: {"type":"tool_call","data":{"name":"order_lookup","args":{"order_id":"..."}}}
+data: {"type":"tool_result","data":{"name":"order_lookup","ok":true,"summary":"..."}}
+data: {"type":"done","data":{"final":"...","message_id":"..."}}
 ```
 
-如果 `host.docker.internal` 不可用，传入 Chatwoot 容器可访问的宿主机地址：
-
-```powershell
-.\scripts\start_demo.ps1 -RuntimeBase "http://192.168.x.x:8766"
-```
-
-暂时不检查 Chatwoot Webhook 时：
-
-```powershell
-.\scripts\start_demo.ps1 -SkipChatwootWebhookCheck
-```
-
-运行日志写入 `tmp/demo-runtime.log` 和 `tmp/demo-runtime.err.log`，PID 写入 `tmp/demo-runtime.pid`。默认端口 `8766` 与当前 Chatwoot webhook 一致，可用 `-Port` 覆盖。不要直接用浏览器打开 `web/landing-v2.html` 文件路径，否则 Widget 与相对 API 地址无法正常工作。
+完整协议、表单与审批事件见 [`docs/specs/event-spec.md`](docs/specs/event-spec.md)。
 
 ## 测试与评估
 
 ```powershell
-# 单元 / 集成测试（含 interrupt 三态恢复、Guard、Select 档位、ToolRegistry 注入）
+# 单元 / 集成测试
 uv run pytest
 
-# 离线确定性评估（routing / policy / guard / handoff 四维，0 依赖真实 API key）
+# 离线确定性评估：routing / policy / guard / handoff
 uv run python -m ai_service_agent.evals --data tests/evals/control --out eval-report.json
 
-# 图结构校验（如环境内置 langgraph CLI）
-langgraph validate
+# LangGraph 图结构校验
+uv run langgraph validate
 ```
 
-## 真机冒烟场景
+CI 状态由首屏 badge 实时反映；README 不硬编码易过期的测试通过数。评估数据集位于 [`tests/evals/control/`](tests/evals/control/)，真实模型 SSE 证据见 [`docs/real-model-smoke.md`](docs/real-model-smoke.md)。
 
-详见 `docs/real-model-smoke.md`（真实 ARK 模型，SSE 事件流证据）：
+## Known Limitations
 
-| 场景 | 输入示例 | 预期链路 |
+| 限制 | 当前行为 | 证据 / 后续 |
 |---|---|---|
-| FAQ / Read | 查订单状态 | SSE 完整事件流 → `done` |
-| Mutation | 把收货地址改成北京市朝阳区 | `form_required`（Form Interrupt）→ Form Resume confirm → 工具只执行一次 → `done`（见 `event-spec.md` §2.2） |
-| HighRisk | 订单10086申请退款 | `approval_required` → `/approvals/{id}/approve` → resume → 工具只执行一次 → `done` |
-| Handoff | 转人工 | `handoff_created` → `conversation_mode=human` → `/handoffs/{id}/resolve` → AI 恢复接管 → `done` |
-| Clarify | 退了吧（CTRL-0076） | `clarification_required`（缺订单号）→ 补参后下一轮进入 HighRisk |
+| Guard v1 仅覆盖字面规则 | 字面 adversarial 样本可拦截，同义替换或间接暗示存在漏判 | [`2026-09-15-p4-guard-llm-eval.md`](docs/decisions/2026-09-15-p4-guard-llm-eval.md) |
+| 写操作必填参数来源未校验 | 模型可能编造订单号等必填参数；已登记为残余风险 | [`2026-09-16-ctrl-0076-clarify-verification.md`](docs/decisions/2026-09-16-ctrl-0076-clarify-verification.md) |
+| Thread 生命周期为 Demo 范围 | 单进程 SQLite、30 个完成 turn 或 24 小时空闲后轮换，无多 worker 租约 | [`thread-lifecycle-spec.md`](docs/specs/thread-lifecycle-spec.md) |
+| 完整演示依赖外部环境 | 真实模型、Chatwoot、LangSmith 与 ARK 端点需要单独配置；默认 Quick Start 只使用 fake model | [`project-audit.md`](docs/project-audit.md) |
 
 ## 文档导航
 
-- 规格：`docs/specs/`（architecture / graph / state / event / safety / approval / tool / handoff / mutation-form-interrupt）· 术语：`CONTEXT.md`
-- 决策记录：`docs/decisions/`（P1–P5 各阶段定案 + Guard / 0076 评估）
-- 实现计划：`docs/plans/`（2026-09-14 起各阶段 TDD 计划）
-- 审计与实测：`docs/project-audit.md`（环境基线）· `docs/real-model-smoke.md`（真机证据）
-- 评估数据集：`tests/evals/control/`（master.jsonl + 分维子集）
+- 规格索引：[`docs/specs/README.md`](docs/specs/README.md)
+- 领域术语：[`CONTEXT.md`](CONTEXT.md)
+- 架构决策：[`docs/adr/`](docs/adr/)
+- 图表索引：[`docs/diagrams/README.md`](docs/diagrams/README.md)
+- 环境与能力审计：[`docs/project-audit.md`](docs/project-audit.md)
+- 真实模型冒烟：[`docs/real-model-smoke.md`](docs/real-model-smoke.md)
+- 本地 Chatwoot 接线：[`docs/ops/chatwoot-widget-agentbot-setup.md`](docs/ops/chatwoot-widget-agentbot-setup.md)
+- 评估数据：[`tests/evals/control/`](tests/evals/control/)
 
-## 设计要点
+## License
 
-- 统一使用 `langchain.agents.create_agent`，禁止 `langgraph.prebuilt.create_react_agent`。
-- FastAPI 只做 Transport，业务编排全部留在图内；入口层仅做 `conversation_mode` 轻量判断。
-- LLM 只负责理解，权限与执行决策由确定性代码做出（Guard / Policy Gate / Safety Precheck / 属主校验）。
-- `conversation_mode` 两态（`ai`/`human`），handoff 建记录 + 切 mode 同事务原子完成；`thread_id` 为独立 checkpoint 标识。
-- Guard v1 为过渡实现：字面 adversarial 样本 5/5 拦截；语义层改写（同义替换 / 间接暗示）漏判已登记为已知风险（`docs/decisions/2026-09-15-p4-guard-llm-eval.md`）。
+[MIT](LICENSE) © 2026 Wang Qi
