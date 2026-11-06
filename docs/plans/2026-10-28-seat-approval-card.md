@@ -1,8 +1,11 @@
 # 坐席端高风险审批：UI 与内容优化方案
 
-> 状态：**方案（未实现）** · 2026-10-28
+> 状态：**已实现**（ADR-0006 / PR #144；T10 Agent Inbox 演示未做）· 2026-10-28
+> 实现记录：`docs/plans/2026-10-28-seat-approval-execution-plan.md` §9 及 §9.1–9.3
 > 范围：Chatwoot 坐席端（Dashboard）里 `highRiskGraph` 的 `approval_required` 投影
 > 配套设计稿：`docs/ops/chatwoot/approval-card-mockup.html`（可切换 8 种状态）
+>
+> 注：§1「现状证据」与 §0 的问题描述是 **2026-10-28 修复前的快照**，不代表当前行为。
 
 ---
 

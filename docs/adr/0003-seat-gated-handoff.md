@@ -6,6 +6,8 @@
 
 **Status:** accepted（2026-10-15）
 
+> **Partially superseded（2026-11-03）**：[ADR-0007](0007-handoff-auto-round-robin.md) 放宽了本 ADR Amendment 中「Handoff Request 不得改变 Chatwoot status / Bot 不得 `toggle_status(open)`」的**部署细则**。启用自动轮询的部署，Runtime 会在写入 `handoff-request` 标签后用 AgentBot token 调官方 `bot_handoff(open)` 清除 Bot 占用，由 assignment policy 轮询分配。**Runtime `mode` 的切换条件不变**：仍需 `open` + 人工 assignee 才切 `human`；其余 Seat-gated 约束继续有效。权威生命周期以 `docs/specs/handoff-spec.md` 为准。
+
 ## Spec / ops
 
 - 术语：根目录 `CONTEXT.md`（Conversation Mode / Handoff Request / Seat Takeover / Handoff Resolve / Handoff Cancel / Handoff Joined Notice）
@@ -32,6 +34,6 @@
 Chatwoot Agent Bot 的持有关系以会话 status 为准，经 **Account Webhook** `conversation_status_changed` 同步 Conversation Mode（不是 AgentBot Outgoing URL）：
 
 - `pending` = Bot 持有（mode `ai`）。mode 已是 `ai` 时忽略，避免 `toggle_status(pending)` 回声成环。
-- `open` 且坐席已接手（`assignee_type=User`，或 self-assign / `Assigned to` activity）= 人工持有（mode `human`）。没有人工 assignee 的 `open` 不是接手。Agent Bot 读超时导致的系统自动 open 默认 `toggle_status(pending)` 拉回 Bot。Bot / 客户路径不得 `toggle_status(open)`。
+- `open` 且坐席已接手（`assignee_type=User`，或 self-assign / `Assigned to` activity）= 人工持有（mode `human`）。没有人工 assignee 的 `open` 不是接手。Agent Bot 读超时导致的系统自动 open 默认 `toggle_status(pending)` 拉回 Bot；但 `open + handoff-request + 无人工 assignee` 是 ADR-0007 等待自动分配的预期状态，**不得**拉回 `pending`。Bot / 客户路径不得 `toggle_status(open)`（**例外：ADR-0007 自动轮询部署，见文首修订提示**）。
 - 交回 Bot 的权威信号是 status 回到 `pending`（不再 toggle）。`resolved` 仍走同一完成路径并 `toggle_status(pending)`，作为兼容。
 - 进入 `human` 时取消未提交的 Mutation Form Interrupt（不写库）。不改 HighRisk 审批，也不改客户表单 UX。
