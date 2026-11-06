@@ -1,5 +1,7 @@
 # 坐席端审批卡 · 执行计划（可交接）
 
+> 状态：**部分实现**（T1–T9 已实现、T10 未做；实现记录见 §9，追加记录见 §9.1–9.3）
+>
 > **交接说明**：本文是给执行 agent 的施工单。按 §4 的任务顺序做，每个任务有独立验收；§8「不要做的事」是硬约束，不要自行扩大范围。
 > 设计依据：`docs/plans/2026-10-28-seat-approval-card.md`（信息架构/文案/状态矩阵）· 视觉稿 `docs/ops/chatwoot/approval-card-mockup.html` · 决策 `docs/adr/0006-seat-approval-card-hitl.md`
 > 现状证据：`docs/ops/chatwoot/approval-before.png`（坐席端实拍）
@@ -296,7 +298,7 @@ pytest tests --ignore=tests/evals
 - **表单提交链路未在真机走通**：会话里残留多个历史 form 时，`form_gate` 的 implicit cancel 会让提交不进入图。
   单测（`test_approval_decide_link.py` 用真实 TestClient 跑完整图）已覆盖决策链路，但「客户填表单 → 审批」这一段建议单独排查。
 - `expires_at` 已过时卡片抬头显示「限时有效」（`_ttl_minutes` 返回 0 的兜底）；真实卡片是发出时的快照，正常情况显示「N 分钟内有效」。
-- T9 的 JS 真按钮、T10 的 Agent Inbox 演示未做。
+- T9 的 JS 真按钮已于 §9.1（2026-10-29）补齐；仅 T10 的 Agent Inbox 演示未做。
 
 ### 9.1 追加：坐席端就地决策（2026-10-29，用户反馈）
 

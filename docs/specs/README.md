@@ -37,7 +37,8 @@
 | C 端 Widget / AgentBot Form | `docs/adr/0001-widget-agentbot-form-contract.md` + `event-spec.md` + `mutation-form-interrupt-spec.md` |
 | Chatwoot 控制台接线 / `.env` | `docs/ops/chatwoot-widget-agentbot-setup.md`（官方文档引用 + `CHATWOOT_*` 映射；Account Webhook ≠ AgentBot） |
 
-- 决策记录见 `docs/decisions/`（架构决策留痕）。
+- 决策记录见 `docs/adr/`（现行 0001–0007；新增决策优先写 ADR，见 `docs/agents/domain.md`）；`docs/decisions/` 为 2026-09~10 历史归档，不再新增。
+- 近期与入口 / 审批相关的决策：[ADR-0006 坐席审批卡](../adr/0006-seat-approval-card-hitl.md) · [ADR-0007 Handoff 自动轮询](../adr/0007-handoff-auto-round-robin.md)（后者部分放宽 ADR-0003 的部署细则）。
 
 ## 变更纪律
 

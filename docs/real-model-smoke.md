@@ -255,7 +255,7 @@
 
 ## 12. 用户页面真机 E2E（2026-09-18；**脚本已删除**）
 
-- 当时目的：自建 SSE 用户页（`web/index.html`）在真实浏览器里对 Runtime 全链路验证。
+- 当时目的：自建 SSE 用户页（该文件已随 `docs/specs/user-page-spec.md` 废止移除）在真实浏览器里对 Runtime 全链路验证。
 - **废弃原因（2026-10-14）**：C 端主入口改为 Chatwoot Widget + AgentBot（ADR 0001）；
   `index.html` 已下线，`web/` 仅留 `landing.html`。依赖 `view-login` / `btn-login` 等 DOM 的
   `scripts/page_e2e_smoke.mjs`、`scripts/page_rag_smoke.mjs` 已删除，勿再运行。

@@ -7,13 +7,13 @@
 ## 2. 环境与基线
 
 - 运行时与依赖以 **`pyproject.toml`** 与 **`.python-version`** 为准；本地 venv 见仓库布局。
-- 已装能力与 API 实测清单：改图 / 换 API 前读 **`docs/project-audit.md`**（尤其 B 节）。
+- API 版本考古可查 **`docs/project-audit.md`** B 节（2026-09-11 历史快照，**非现行架构说明**）；现行能力以 **`pyproject.toml`** + 已安装包 + `docs/specs/` 为准。
 - 模型与密钥走 **`.env`**（OpenAI 兼容；具体供应商见环境文件，不在此复述）。
 
 ## 3. 框架优先
 
 - **Framework-first**：图编排、interrupt / resume、工具执行、checkpointer、预置 agent / 节点——先采用 LangGraph / LangChain **官方组件或推荐路径**（如 `interrupt` + `Command(resume=...)`、`ToolNode`、`langchain.agents.create_agent`）。
-- **Docs via Context7**：API、版本差异或官方推荐写法不确定时，先用 **Context7 MCP** 查当前 `langgraph` / `langchain` 文档，再编码。文档与本机实测冲突时，以 **已安装环境**（`docs/project-audit.md`）为准并注明差异。
+- **Docs via Context7**：API、版本差异或官方推荐写法不确定时，先用 **Context7 MCP** 查当前 `langgraph` / `langchain` 文档，再编码。文档与本机实测冲突时，以 **已安装环境**（`pyproject.toml` + 运行期实测）为准并注明差异。
 - 仅当官方组件盖不住已定规格时才写适配层，并写清：**官方缺口、不能用的原因、自写边界**。
 
 ## 4. Transport vs Graph
@@ -39,7 +39,10 @@
 | Thread 生命周期 / 惰性创建 / resume 保护 / checkpoint 清理 | `docs/specs/thread-lifecycle-spec.md` + `docs/ops/thread-checkpoint-cleanup.md` |
 | 持久化 / 错误 / harness hook / 测试基线 | `docs/specs/architecture.md` |
 | C 端入口（Widget / AgentBot） | `docs/adr/0001-widget-agentbot-form-contract.md`（`user-page-spec.md` 已废止） |
-| 架构决策留痕 | `docs/decisions/`（新决策优先 `docs/adr/`，见 `docs/agents/domain.md`） |
+| Handoff 自动轮询 / conversation status | `docs/adr/0007-handoff-auto-round-robin.md` + `docs/specs/handoff-spec.md`（部分放宽 ADR-0003 部署细则） |
+| 坐席端审批卡 / HighRisk HITL | `docs/adr/0006-seat-approval-card-hitl.md` + `docs/ops/chatwoot/seat-approval.js` + `docs/specs/approval-spec.md` |
+| Widget 视觉 / CSS-JS 覆盖 | `docs/ops/chatwoot-widget-form.md` + `docs/ops/chatwoot-z2-form-echo-hide.md` |
+| 架构决策留痕 | `docs/adr/`（现行 0001–0007，新增决策优先写 ADR）；`docs/decisions/` 为历史归档，不再新增。见 `docs/agents/domain.md` |
 
 ## 6. 常驻硬约束
 

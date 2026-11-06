@@ -1,7 +1,7 @@
 # Form Gate 深模块：统一「挂起中的 Form Interrupt + 入站」决策
 
 - 日期：2026-10-19
-- 状态：待评审
+- 状态：**已实现**（Phase 1 / Phase 2；落地 `harness/form_gate.py::decide_form_inbound`，实现记录见文末）
 - 相关：ADR-0001、`CONTEXT.md`（Implicit Cancel / Form-Only Write）、#71、#72
 
 ---

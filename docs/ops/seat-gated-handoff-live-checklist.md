@@ -31,7 +31,7 @@ uv run --no-sync python scripts/live_seat_gated_triangular.py
 
 ## 1. 三角路径（人工 / Widget）
 
-登录任意客户（seed 口令见 `docs/manual-e2e-fullchain-test-cases.md`），打开 Website Widget。
+登录任意客户（演示账号：客户手机号，默认密码 `123456`，见 `web/landing.html` 登录弹窗；seed 数据由 `scripts/seed_mock_db.py` 生成），打开 Website Widget。
 
 | Step | Actor | Action | Expect |
 |---|---|---|---|

@@ -20,4 +20,4 @@
 
 ## Platform
 
-- Web, delivered as the static frontend entrypoints `web/landing.html` / `web/landing-v2.html`. The former `web/index.html` was removed when `docs/specs/user-page-spec.md` was deprecated (2026-10-14).
+- Web, delivered as the static frontend entrypoints `web/landing.html` / `web/landing-v2.html`. The earlier single-file SSE page was removed when `docs/specs/user-page-spec.md` was deprecated (2026-10-14).
