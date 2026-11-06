@@ -22,7 +22,8 @@ FastAPI (REST + SSE/WS, 仅传输层)
 Conversation Runtime（入口层，轻量 conversation_status）
    |  conversation_mode == human ? -> 人工车道（写 Message Store + 通知坐席，不触图）
    |  conversation_mode == ai      -> 进入 CustomerServiceGraph
-   |  接收子图 interrupt(handoff_request) -> 建 Handoff Record + 原子切 mode=human + 发 handoff_created
+   |  接收子图 interrupt(handoff_request) -> 建/复用 awaiting_seat + handoff_requested（mode 仍为 ai）
+   |  Seat Takeover（open + User assignee）-> 激活 Handoff + 原子切 mode=human + 发 handoff_created
    |  人工 Resolve -> mode=ai + 发 handoff_resolved
    |  发送 AI 回复前最终校验 mode == ai（实时值，非生成时刻值）
    v
@@ -176,7 +177,7 @@ docs/                     # project-audit.md + specs/
 - **入口闸门**（`conversation_mode`）只回答"这条消息 AI 能不能碰"，不关心图内进度；判断必须轻量（见 `handoff-spec.md` §2）。
 - **图内进度**（`execution_status`）回答"本 turn 走到哪一步"，随 checkpoint 落库；转人工时置 `waiting_handoff`，与 `mode` **分层但语义一致**（分属 checkpoint 与外层表，非同一事务）。
 - **审批状态**只由服务持久化，业务决策全在图内；MVP 第一公里未纳入（见 `mvp-first-mile.md` §2）。
-- **Handoff Record** 创建与 `mode` 切换为**同一事务**（`handoff-spec.md` §1.2 的原子性）。
+- **Seat Takeover 激活 Handoff Record** 与 `mode=human` 切换为**同一事务**；Handoff Request 创建本身只写 `awaiting_seat`，不切 mode（`handoff-spec.md` §1.2 的原子性）。
 - 全景观图：`docs/diagrams/state-machines.html`。
 
 ## 12. Order 数据边界（2026-10-10）

@@ -20,9 +20,9 @@ flowchart TD
     P --> FB["Fallback<br/>unknown / 兜底"]
     SF & RD & MU & HR & CP & FB --> F["Final Response<br/>写回 messages + 归一化事件"]
     RD & MU & HR & FB --> HO["interrupt(handoff_request)<br/>外层：建/复用 awaiting_seat + handoff_requested<br/>execution_status=waiting_handoff；mode 仍为 ai"]
-    HO --> Q["Chatwoot 人工队列<br/>handoff-request tag + private note<br/>open → round_robin"]
-    Q --> T["Seat Takeover<br/>open + User assignee"]
-    T --> H["human 车道<br/>active handoff + mode=human + handoff_created"]
+    HO --> QUEUE["Chatwoot 人工队列<br/>handoff-request tag + private note<br/>open → round_robin"]
+    QUEUE --> TAKEOVER["Seat Takeover<br/>open + User assignee"]
+    TAKEOVER --> H["human 车道<br/>active handoff + mode=human + handoff_created"]
     HR -. "approval_required" .-> AP["Seat Approver<br/>Approval Side-Channel private card"]
     AP -. "approve / reject → Runtime resume<br/>conversation_mode 不变" .-> HR
     H --> RESOLVE["人工 Resolve<br/>校验 pending 审批 → mode=ai<br/>handoff_resolved"]

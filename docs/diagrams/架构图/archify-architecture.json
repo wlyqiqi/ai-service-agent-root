@@ -9,7 +9,7 @@
     "views": [
       {
         "id": "request-path",
-        "label": "读路径",
+        "label": "读取",
         "focus": [
           "widget",
           "fastapi",
@@ -24,7 +24,7 @@
       },
       {
         "id": "mutation-path",
-        "label": "变更路径",
+        "label": "写入",
         "focus": [
           "widget",
           "fastapi",
@@ -38,7 +38,7 @@
       },
       {
         "id": "high-risk-path",
-        "label": "高风险审批",
+        "label": "审批",
         "focus": [
           "seat",
           "fastapi",
@@ -58,10 +58,11 @@
           "runtime",
           "graph",
           "complaint_graph",
+          "fallback",
           "seat",
           "state"
         ],
-        "note": "Complaint 先安抚询问；明确请求后进入 Chatwoot 队列，Seat Takeover 后切 human。"
+        "note": "Complaint 先安抚询问；明确请求后进入队列，Seat Takeover 后切 human；Approval 保持独立。"
       }
     ]
   },
@@ -236,6 +237,20 @@
         340,
         76
       ]
+    },
+    {
+      "id": "fallback",
+      "type": "backend",
+      "label": "Fallback",
+      "sublabel": "unknown · Concierge",
+      "pos": [
+        1140,
+        430
+      ],
+      "size": [
+        168,
+        64
+      ]
     }
   ],
   "boundaries": [
@@ -263,7 +278,8 @@
         "read_graph",
         "mutation_graph",
         "high_risk_graph",
-        "complaint_graph"
+        "complaint_graph",
+        "fallback"
       ]
     },
     {
@@ -383,6 +399,11 @@
       "label": "checkpoint",
       "fromSide": "bottom",
       "toSide": "top"
+    },
+    {
+      "id": "graph-to-fallback",
+      "from": "graph",
+      "to": "fallback"
     }
   ],
   "cards": [

@@ -35,13 +35,14 @@
   |                                                      |
   |                    +---------------------------------+  任意子图检测到转人工信号
   |                    v
-  |        interrupt(handoff_request) -> 外层接管（建 Record + 原子切 mode + 发 handoff_created）
+  |        interrupt(handoff_request) -> 外层建/复用 awaiting_seat + handoff_requested（mode 仍为 ai）
+  |        Seat Takeover（open + User assignee）-> active Handoff + 原子切 mode=human + 发 handoff_created
   |
   +- 正常完成 -> END（Final Response 统一出口）
 ```
 
 - **入口 resume 调度（实测修正）**：LangGraph 1.2.11 中，带输入的新调用在图内节点 / START 条件边**读不到 `state["__interrupt__"]`**，且会弃置挂起中断并新起 run；恢复只能由调用方以 `Command(resume=...)` 在 invoke 层发起（实测依据见 `docs/decisions/2026-09-14-checkpointer-resume-handoff.md`）。因此「有挂起中断时新 turn 必须走入口层 resume 调度」由 harness 在每次图调用前经 `aget_state()` 判定实现；恢复语义 = 回应上一个问题，不重新走 Router。
-- 子图检测到需要转人工的信号时，**不自行创建 Handoff Record、不自行切换 `conversation_mode`**，统一抛出 `interrupt({"type": "handoff_request", "reason": ..., "summary": ...})`；外层（Conversation Runtime）负责接收信号 → 创建 Handoff Record → 原子切换 `conversation_mode` → 发出 `handoff_created` 事件。子图不直接调用任何 Handoff API（机制与事件见 `handoff-spec.md` §3 / `event-spec.md`）。
+- 子图检测到需要转人工的信号时，**不自行创建 Handoff Record、不自行切换 `conversation_mode`**，统一抛出 `interrupt({"type": "handoff_request", "reason": ..., "summary": ...})`；外层（Conversation Runtime）负责接收信号 → 创建/复用 `awaiting_seat` Handoff Request → 发出 `handoff_requested` 与强提示（`conversation_mode` 仍为 `ai`）。Seat Takeover（`open + User assignee`）后才激活 Handoff、切 `conversation_mode=human` 并发出 `handoff_created`。子图不直接调用任何 Handoff API（机制与事件见 `handoff-spec.md` §3 / `event-spec.md`）。
 - 抛出 `handoff_request` 后 `execution_status` 置 `waiting_handoff`（见 `state-spec.md` §1），不得置 `completed` / `failed`。
 - Final Response：子图结果写回 `messages`，由 harness 统一推送事件（见 `event-spec.md`）。
 - **Runtime 依赖注入（2026-10-10）**：顶层 `StateGraph` 使用 `context_schema=GraphContext`。`GraphContext` 提供 `order_repository` / `approval_service` / `user_id`，节点与子图通过 LangGraph `Runtime` 读取，不通过全局 settings 直接取数据库连接。默认仍可由 `build_graph` 构造 `SQLiteOrderRepository`，但生产可注入其他 adapter。
@@ -139,7 +140,7 @@
 
 - ReadGraph / MutationGraph / HighRiskGraph 检测到需要转人工的信号时，不自行创建 Handoff Record，也不自行决定 `conversation_mode` 切换；统一抛出一次 interrupt，resume / 退出信号类型为：
   `interrupt({"type": "handoff_request", "reason": ..., "summary": ...})`
-- 外层（Conversation Runtime 或等价的入口逻辑）统一负责：接收该信号 → 创建 Handoff Record → 原子切换 `conversation_mode` → 发出 `handoff_created` 事件。子图自身不直接调用 Handoff 相关的任何 API。
+- 外层（Conversation Runtime 或等价的入口逻辑）统一负责：接收该信号 → 创建/复用 `awaiting_seat` Handoff Request → 发出 `handoff_requested` 与强提示（`conversation_mode` 仍为 `ai`）。Seat Takeover（`open + User assignee`）后才激活 Handoff、原子切 `conversation_mode=human` 并发出 `handoff_created`。子图自身不直接调用 Handoff 相关的任何 API。
 - 抛出后 `execution_status` 置 `waiting_handoff`（见 `state-spec.md` §1），不得置 `completed` / `failed`。
 - 触发信号来源为 `check_handoff` 等确定性规则（见 `safety-spec.md` §2）；LLM 无权临时决定转人工。
 - 投诉询问的同意**不**走这条 interrupt：复用入口 `request_handoff`（见 §6.6）。`complaint_offer_pending` 期间情绪规则不得自动抛 `handoff_request`。
