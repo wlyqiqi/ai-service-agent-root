@@ -82,7 +82,19 @@
 | 审批被拒后坚持 | HighRisk 审批被拒后用户仍要求执行 | 开关（默认开） |
 | 策略上限 | 单会话时长 / token / turn 数超限 | 阈值 |
 
-> P0（2026-09-18）：**显式请求由入口层 `detect_handoff_intent` 优先判定**——在进入 LangGraph 之前命中即直接走人工车道（不触发 Router / Guard / Graph）；动态信号（连续失败 / 情绪 / 审批被拒后坚持等）仍由图内 `check_handoff` 判定（决策见 `docs/plans/2026-09-18-handoff-intent-gate.md`）。
+**实现状态（2026-11-06）** —— 上表是目标规则集，**不是现行能力清单**。以 `src/ai_service_agent/graph/workflows/fallback.py::check_handoff` 为准：
+
+| 类别 | 状态 | 依据 |
+|---|---|---|
+| 显式请求 | ✅ 已实现 | 入口层 `detect_handoff_intent`（进图前）；图内 `check_handoff` 亦兜底 |
+| 连续失败（路由级 / 兜底级） | ✅ 已实现 | `fallback_count >= fallback_max_turns`（默认 4，第 5 次触发），触发后清零 |
+| 连续失败（工具级） | ❌ 未实现 | `check_handoff` 无工具失败计数 |
+| 重复未解决 | ❌ 未实现 | 无重复诉求计数；`clarify_count` 只用于 clarify 轮次 |
+| 情绪信号 | ⚠️ 占位、未启用 | 有 `emotion_handoff_reason` 出口与 `complaint_offer_pending` 闸门，但 `_emotion_signal()` 恒返回 `False`（PR-A 不启用） |
+| 审批被拒后坚持 | ❌ 未实现 | 审批拒绝走 `finalize_rejected`，不转人工 |
+| 策略上限 | ❌ 未实现 | thread 轮换 / 空闲回收属生命周期机制，不触发 handoff |
+
+> P0（2026-09-18）：**显式请求由入口层 `detect_handoff_intent` 优先判定**——在进入 LangGraph 之前命中即直接走人工车道（不触发 Router / Guard / Graph）；动态信号（工具级连续失败 / 情绪 / 审批被拒后坚持等）**规划**由图内 `check_handoff` 判定，**当前多数尚未实现，勿按上表当作现行能力**（决策见 `docs/plans/2026-09-18-handoff-intent-gate.md`）。
 >
 > PR-A（2026-10-26）：`context["complaint_offer_pending"]` 为真时，**禁止情绪规则自动 `handoff_request`**。此期间只有入口层 `detect_handoff_intent`，或用户对投诉询问的窄肯定（复用同一 `request_handoff`，reason=`complaint`），才可挂起。投诉硬闸只强制图内 `route_intent=complaint`，不切 `conversation_mode`。
 
@@ -95,12 +107,12 @@
        -> 通知用户（含工单号/排队说明）-> 本 turn 结束
 ```
 
-- 触发判定节点：`check_handoff`（确定性规则）检测信号并置位 `handoff` / `execution_status=waiting_handoff`，随后抛出 `interrupt(handoff_request)`。连续 fallback 当前使用 `context["fallback_count"]`，触发后清零；工具级失败后续应复用同一 `check_handoff` 消费入口和 `context` 计数语义，禁止各自维护独立计数。Concierge / 审批拒绝分支可复用同一机制置位转人工信号。
+- 触发判定节点：`check_handoff`（确定性规则）检测信号并置位 `handoff` / `execution_status=waiting_handoff`，随后抛出 `interrupt(handoff_request)`。连续 fallback 当前使用 `context["fallback_count"]`，触发后清零。**工具级失败计数、重复未解决、审批被拒后坚持、策略上限均未实现**；后续实现时应复用同一 `check_handoff` 消费入口和 `context` 计数语义，禁止各自维护独立计数。Concierge / 审批拒绝分支同理（当前未接入）。
 - 转人工后 `conversation_mode=human`，后续用户消息在入口直接进入**人工车道**（写 Message Store + 通知坐席，见 `handoff-spec.md` §1），不触发 checkpointer / Graph / Guard / Router；人工 Resolve 回切 mode=ai 后恢复 AI 路径。
 
 ### 2.3 边界
 
-- **审批拒绝 ≠ 自动转人工**：拒绝后按 2.1 规则判定（默认用户坚持才转）。
+- **审批拒绝 ≠ 自动转人工**：规划上拒绝后按 2.1 规则判定（默认用户坚持才转）；**该规则当前未实现**，实际走 `finalize_rejected`，不产生 handoff。
 - 预检失败不直接转人工，按 1.3 收尾；用户再次追问同一操作时才累计计数。
 - 转人工信号由确定性节点 `check_handoff` 检测并经 `interrupt(handoff_request)` 抛出，**不作为工具注册**、不进入任何 agent 工具集，LLM 无权选择转人工；Handoff Record 创建与 `conversation_mode` 切换由外层（Conversation Runtime）统一完成，子图不直接调用任何 Handoff API（见 `graph-spec.md` §6.5、`handoff-spec.md` §3）。
 
