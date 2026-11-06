@@ -168,10 +168,10 @@ docs/                     # project-audit.md + specs/
 
 | 状态机 | 取值 | 存储位置 | 管理位置 | 转移触发 |
 |---|---|---|---|---|
-| `conversation_mode` | `ai` / `human` | 轻量 `conversation_status`（独立表/Redis key，`conversation_id → mode`） | **入口层**（Conversation Runtime），不进 LangGraph | `ai→human`：收 `interrupt(handoff_request)` 后与建 Handoff Record **同一事务**原子切换；`human→ai`：人工 Resolve（前置校验 pending 审批仍有效；**审批归宿**不再是「继续挂起等 AI」——Seat Approver / Approval Side-Channel，见 [ADR-0002](../adr/0002-seat-approver-side-channel.md)；`handoff-spec.md` §1.3 / §5.1 归宿段已 supersede） |
+| `conversation_mode` | `ai` / `human` | 轻量 `conversation_status`（独立表/Redis key，`conversation_id → mode`） | **入口层**（Conversation Runtime），不进 LangGraph | `ai→human`：Handoff Request 只创建/复用 `awaiting_seat` 挂起（mode 仍为 `ai`）；Chatwoot 队列 round-robin 后由 Seat Takeover（`open + User assignee`）与激活 Handoff Record **同一事务**切 `human`；`human→ai`：人工 Resolve（前置校验 pending 审批仍有效；审批归宿见 [ADR-0002](../adr/0002-seat-approver-side-channel.md)） |
 | `execution_status` | 9 值（`idle…waiting_handoff…failed`） | LangGraph **State 内字段**，随 checkpoint 持久化 | **图内**（Router / 子图 / `final` 按 turn 阶段置位） | `check_handoff` 抛 `handoff_request` 前置 `waiting_handoff`；Resolve 后由入口层 `Command(resume=...)` 续接子图，最终由 `final` 置 `completed` |
 | 审批状态 | `pending / approved / rejected / expired` | Approval Service（轻量状态存储，同 `conversation_status` 定位） | 状态存储在外置服务（惰性过期）；**业务决策在图内** | 图发起 interrupt；HTTP 端点前置校验后 `Command(resume=...)` 恢复（见 `approval-spec.md` §3） |
-| Handoff 生命周期 | `created → 接管中 → resolved` | `handoff_record` 表 | **外层**创建 / resolve，与 mode 切换同事务 | 子图 `interrupt(handoff_request)` → 外层建 Record + 切 mode + `handoff_created`；`POST /handoffs/{id}/resolve` → `handoff_resolved` |
+| Handoff 生命周期 | `awaiting_seat → active → resolved` | `handoff_record` 表 | **外层**创建请求 / 激活 / resolve；Seat Takeover 与 mode 切换同事务 | 子图 `interrupt(handoff_request)` → 外层创建/复用 `awaiting_seat` + `handoff_requested`（不切 mode）；Seat Takeover → `active` + `handoff_created`；Resolve → `resolved` + `handoff_resolved` |
 
 - **入口闸门**（`conversation_mode`）只回答"这条消息 AI 能不能碰"，不关心图内进度；判断必须轻量（见 `handoff-spec.md` §2）。
 - **图内进度**（`execution_status`）回答"本 turn 走到哪一步"，随 checkpoint 落库；转人工时置 `waiting_handoff`，与 `mode` **分层但语义一致**（分属 checkpoint 与外层表，非同一事务）。

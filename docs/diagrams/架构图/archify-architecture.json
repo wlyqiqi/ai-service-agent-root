@@ -42,6 +42,7 @@
         "focus": [
           "seat",
           "fastapi",
+          "runtime",
           "high_risk_graph",
           "state",
           "graph"
@@ -50,15 +51,17 @@
       },
       {
         "id": "complaint-path",
-        "label": "投诉兜底",
+        "label": "投诉 / 人工",
         "focus": [
           "widget",
           "fastapi",
           "runtime",
           "graph",
-          "complaint_fallback"
+          "complaint_graph",
+          "seat",
+          "state"
         ],
-        "note": "投诉先安抚并询问是否转人工；Fallback 负责 unknown 与兜底。"
+        "note": "Complaint 先安抚询问；明确请求后进入 Chatwoot 队列，Seat Takeover 后切 human。"
       }
     ]
   },
@@ -81,7 +84,7 @@
       "id": "seat",
       "type": "external",
       "label": "Chatwoot Seat",
-      "sublabel": "Takeover · Approver",
+      "sublabel": "Takeover · Seat Approver",
       "pos": [
         48,
         560
@@ -125,7 +128,7 @@
       "id": "graph",
       "type": "backend",
       "label": "CustomerServiceGraph",
-      "sublabel": "Guard ∥ Router → Policy → 5 子图",
+      "sublabel": "Guard ∥ Router → Policy → 子图",
       "pos": [
         590,
         400
@@ -179,10 +182,10 @@
       "tag": "Approval"
     },
     {
-      "id": "complaint_fallback",
+      "id": "complaint_graph",
       "type": "backend",
-      "label": "Complaint / Fallback",
-      "sublabel": "安抚确认 · unknown 兜底",
+      "label": "ComplaintGraph",
+      "sublabel": "安抚 · 询问转人工",
       "pos": [
         920,
         490
@@ -223,14 +226,14 @@
     {
       "id": "state",
       "type": "database",
-      "label": "SQLite State",
-      "sublabel": "message · approval · thread · checkpoint",
+      "label": "State Stores",
+      "sublabel": "mode · messages · approvals · threads · checkpoints",
       "pos": [
         450,
         620
       ],
       "size": [
-        300,
+        340,
         76
       ]
     }
@@ -260,7 +263,7 @@
         "read_graph",
         "mutation_graph",
         "high_risk_graph",
-        "complaint_fallback"
+        "complaint_graph"
       ]
     },
     {
@@ -282,11 +285,30 @@
       "variant": "emphasis"
     },
     {
-      "id": "seat-to-fastapi",
+      "id": "seat-takeover",
       "from": "seat",
       "to": "fastapi",
-      "label": "Takeover / 审批决策",
-      "variant": "security"
+      "label": "Takeover → human",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        205,
+        535
+      ]
+    },
+    {
+      "id": "seat-approval",
+      "from": "seat",
+      "to": "fastapi",
+      "label": "Approval decision",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        205,
+        485
+      ]
     },
     {
       "id": "fastapi-to-runtime",
@@ -320,7 +342,7 @@
     {
       "id": "graph-to-complaint",
       "from": "graph",
-      "to": "complaint_fallback"
+      "to": "complaint_graph"
     },
     {
       "id": "read-to-tools",
@@ -368,8 +390,8 @@
       "dot": "cyan",
       "title": "入口与会话",
       "items": [
-        "Widget → AgentBot；human 只写 Message Store，Takeover 后才切 mode",
-        "thread 惰性创建、有界水合、30 轮/24 小时轮换并清理"
+        "Widget → AgentBot；human 只写 Message Store，Seat Takeover 后才切 mode",
+        "thread 惰性创建、有界水合；pending interrupt 固定 thread，ThreadReaper 在完成边界轮换/清理"
       ]
     },
     {
@@ -377,15 +399,15 @@
       "title": "编排与风险分层",
       "items": [
         "Guard ∥ Router → Policy 派生 Read / Mutation / HighRisk / Complaint / Fallback",
-        "Mutation 用 Form；HighRisk 预检→审批→重校验；Complaint 不自动转人工"
+        "Mutation 用 Form；HighRisk 预检→审批→重校验；Complaint 不自动转人工，Fallback 独立兜底"
       ]
     },
     {
       "dot": "rose",
       "title": "状态、审批与模型",
       "items": [
-        "Message / approval / thread / checkpoint 分职责存储",
-        "Seat Approver 走独立旁路；Router/Select/Agent 调用 ARK，Tools 不调用 LLM"
+        "conversation_mode 外置；messages / approvals / threads / checkpoints 分职责存储",
+        "Seat Takeover 切 human；Approval 走独立旁路不切 mode；Router/Agent 调 ARK"
       ]
     }
   ]
