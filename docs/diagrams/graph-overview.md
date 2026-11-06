@@ -16,8 +16,9 @@ flowchart TD
     P --> RD["ReadGraph<br/>ReAct + 只读工具"]
     P --> MU["MutationGraph<br/>select（tool 或 Operation Clarify）→ 预检 → Form Interrupt → 执行"]
     P --> HR["HighRiskGraph<br/>select → 预检/Form → 审批 interrupt"]
+    P --> CP["ComplaintGraph<br/>安抚 + 询问是否转人工（不自动 handoff）"]
     P --> FB["Fallback<br/>unknown / 兜底"]
-    SF & RD & MU & HR & FB --> F["Final Response<br/>写回 messages + 归一化事件"]
+    SF & RD & MU & HR & CP & FB --> F["Final Response<br/>写回 messages + 归一化事件"]
     RD & MU & HR & FB --> HO["interrupt(handoff_request)<br/>外层：建 Record + 切 mode + 发事件"]
     HO -.-> H
     F --> PRE{"发送前重校验 mode == ai ?<br/>读实时值"}
@@ -33,4 +34,4 @@ flowchart TD
 - Router 唯一语义输出是 `route_intent` + `confidence`；子图选择由 Policy Gate 确定性派生（见 `state-spec.md`）。
 - Mutation 主路径用 Form Interrupt（`form_required`），不是聊天 `confirmation_required`；tool 未定由 Mutation `mutation_select_llm` 内联 Operation Clarify（ADR 0004），无入口 Hybrid。HighRisk 工具选择为 `high_risk_select_llm`（ADR 0005）。
 - Form / 审批挂起时父图 `execution_status` 常仍为 `routing`；对外权威是 checkpointer `__interrupt__`。
-- `conversation_id=session_id`、`thread_id` 一对一映射见 `handoff-spec.md` §5.1。pending 审批「继续挂起等 AI」归宿 **已废止**（[ADR-0002](../adr/0002-seat-approver-side-channel.md)）。
+- `conversation_id=session_id`；`thread_id` 是 LangGraph checkpoint 标识，不是同一字段。thread 惰性创建、可在安全边界轮换，见 `thread-lifecycle-spec.md`。pending 审批「继续挂起等 AI」归宿 **已废止**（[ADR-0002](../adr/0002-seat-approver-side-channel.md)）。
