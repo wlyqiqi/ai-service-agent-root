@@ -33,7 +33,7 @@
   |                                                     v
   |                                         Read / Mutation / HighRisk / Complaint / Fallback
   |                                                      |
-  |                    +---------------------------------+  任意子图检测到转人工信号
+  |                    +---------------------------------+  Read / Mutation / HighRisk / Fallback 检测到转人工信号
   |                    v
   |        interrupt(handoff_request) -> 外层建/复用 awaiting_seat + handoff_requested（mode 仍为 ai）
   |        Seat Takeover（open + User assignee）-> active Handoff + 原子切 mode=human + 发 handoff_created

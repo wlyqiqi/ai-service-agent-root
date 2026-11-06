@@ -22,6 +22,8 @@ FastAPI (REST + SSE/WS, 仅传输层)
 Conversation Runtime（入口层，轻量 conversation_status）
    |  conversation_mode == human ? -> 人工车道（写 Message Store + 通知坐席，不触图）
    |  conversation_mode == ai      -> 进入 CustomerServiceGraph
+   |  decide_entry（确定性前置）: request / cancel -> 外层 Handoff 生命周期（不触图/checkpointer）
+   |  普通 AI 消息 -> 进入 CustomerServiceGraph
    |  接收子图 interrupt(handoff_request) -> 建/复用 awaiting_seat + handoff_requested（mode 仍为 ai）
    |  Seat Takeover（open + User assignee）-> 激活 Handoff + 原子切 mode=human + 发 handoff_created
    |  人工 Resolve -> mode=ai + 发 handoff_resolved

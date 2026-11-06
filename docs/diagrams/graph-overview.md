@@ -26,7 +26,8 @@ flowchart TD
     HR -. "approval_required" .-> AP["Seat Approver<br/>Approval Side-Channel private card"]
     AP -. "approve / reject → Runtime resume<br/>conversation_mode 不变" .-> HR
     H --> RESOLVE["人工 Resolve<br/>校验 pending 审批 → mode=ai<br/>handoff_resolved"]
-    RESOLVE --> A
+    RESOLVE -- "有被中断子图" --> R
+    RESOLVE -. "无挂起" .-> A
     F --> PRE{"发送前重校验 mode == ai ?<br/>读实时值"}
     PRE -- "是(ai)" --> SEND["通过 SSE / AgentBot 发送"]
     PRE -- "否" --> DROP["丢弃（防双重回复）"]
